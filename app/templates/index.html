@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PythaDoc – Keep your Python docs as true as your code." />
+    <title>PythaDoc – Keep your Python docs as true as your code</title>
+
+    <!--
+      ════════════════════════════════════════════
+      FLASK STATIC-ASSET CONFIGURATION NOTE
+      ════════════════════════════════════════════
+      All asset paths below use the root-relative prefix /static/ which
+      matches Flask's default static URL path.
+
+      Recommended Flask bootstrap (app.py / wsgi.py):
+      ──────────────────────────────────────────────
+        from flask import Flask, send_from_directory
+
+        app = Flask(
+            __name__,
+            static_folder="frontend",   # maps  frontend/  →  /static/
+            static_url_path="/static",
+        )
+
+        @app.route("/")
+        def index():
+            return send_from_directory("frontend", "index.html")
+
+      With this setup:
+        frontend/css/styles.css   →  /static/css/styles.css   ✔
+        frontend/js/app.js        →  /static/js/app.js        ✔
+        frontend/assets/images/   →  /static/assets/images/   ✔
+
+      If you later switch to Jinja2 templates, replace each path with:
+        {{ url_for('static', filename='css/styles.css') }}
+      ════════════════════════════════════════════
+    -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+
+  <body>
+
+    <!-- ═══════════════════════════════════════════
+         APP SHELL
+    ═══════════════════════════════════════════ -->
+    <div id="app-shell" class="app-shell">
+
+      <!-- ─────────────────────────────────────────
+           SIDEBAR
+      ───────────────────────────────────────── -->
+      <aside id="sidebar" class="sidebar" role="navigation" aria-label="Primary navigation">
+
+        <!-- Brand -->
+        <div class="sidebar__brand">
+          <span class="sidebar__brand-icon" aria-hidden="true">⟳</span>
+          <div class="sidebar__brand-text">
+            <span class="sidebar__brand-name">PythaDoc</span>
+            <span class="sidebar__brand-tagline">Keep your Python docs as true as your code</span>
+          </div>
+        </div>
+
+        <!-- Navigation Links
+             JS: on click, read data-section, show matching #section-{value},
+             add --active class here, set aria-current="page". -->
+        <nav class="sidebar__nav">
+          <ul class="sidebar__nav-list" role="list">
+
+            <li class="sidebar__nav-item">
+              <a href="#section-dashboard"
+                 id="nav-dashboard"
+                 class="sidebar__nav-link sidebar__nav-link--active"
+                 data-section="dashboard"
+                 aria-current="page"
+                 role="menuitem">
+                <span class="sidebar__nav-icon" aria-hidden="true">▦</span>
+                <span class="sidebar__nav-label">Dashboard</span>
+              </a>
+            </li>
+
+            <li class="sidebar__nav-item">
+              <a href="#section-findings"
+                 id="nav-findings"
+                 class="sidebar__nav-link"
+                 data-section="findings"
+                 role="menuitem">
+                <span class="sidebar__nav-icon" aria-hidden="true">⚑</span>
+                <span class="sidebar__nav-label">Findings</span>
+                <!-- JS: update textContent and aria-label after scan -->
+                <span class="sidebar__nav-badge"
+                      id="badge-findings"
+                      aria-label="0 findings">0</span>
+              </a>
+            </li>
+
+            <li class="sidebar__nav-item">
+              <a href="#section-ledger"
+                 id="nav-ledger"
+                 class="sidebar__nav-link"
+                 data-section="ledger"
+                 role="menuitem">
+                <span class="sidebar__nav-icon" aria-hidden="true">≡</span>
+                <span class="sidebar__nav-label">Claims Ledger</span>
+              </a>
+            </li>
+
+            <li class="sidebar__nav-item">
+              <a href="#section-fixes"
+                 id="nav-fixes"
+                 class="sidebar__nav-link"
+                 data-section="fixes"
+                 role="menuitem">
+                <span class="sidebar__nav-icon" aria-hidden="true">✎</span>
+                <span class="sidebar__nav-label">Suggested Fixes</span>
+                <!-- JS: update textContent and aria-label after scan -->
+                <span class="sidebar__nav-badge sidebar__nav-badge--success"
+                      id="badge-fixes"
+                      aria-label="0 suggested fixes">0</span>
+              </a>
+            </li>
+
+          </ul>
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <footer class="sidebar__footer">
+          <span class="sidebar__footer-version">v0.1.0-alpha</span>
+        </footer>
+
+      </aside>
+      <!-- /sidebar -->
+
+      <!-- ─────────────────────────────────────────
+           MAIN COLUMN  (topbar + content)
+      ───────────────────────────────────────── -->
+      <div class="main-column">
+
+        <!-- ───────────────────────────────────────
+             TOP NAVIGATION BAR
+        ─────────────────────────────────────── -->
+        <header id="topbar" class="topbar" role="banner">
+
+          <!-- Dynamic Page Title -->
+          <div class="topbar__title-group">
+            <button class="topbar__sidebar-toggle"
+                    id="sidebar-toggle"
+                    type="button"
+                    aria-label="Toggle sidebar"
+                    aria-expanded="true"
+                    aria-controls="sidebar">
+              ☰
+            </button>
+            <h1 class="topbar__page-title" id="page-title">Dashboard</h1>
+          </div>
+
+          <!--
+            Repository scan form
+            ════════════════════
+            JS: listen for the 'submit' event on #scan-form.
+            Call e.preventDefault(), read #repo-url-input.value,
+            validate it, then trigger the scan pipeline.
+            The browser's built-in URL validation is intentionally
+            suppressed (novalidate) so JS can show custom inline errors.
+          -->
+          <form id="scan-form"
+                class="topbar__controls"
+                role="search"
+                aria-label="Repository scan controls"
+                action="#"
+                novalidate>
+
+            <label for="repo-url-input" class="topbar__label">Repository URL</label>
+            <input
+              type="url"
+              id="repo-url-input"
+              name="repo-url"
+              class="topbar__repo-input"
+              placeholder="https://github.com/owner/repo"
+              aria-label="Repository URL"
+              aria-required="true"
+              aria-describedby="repo-url-error"
+              autocomplete="url"
+              spellcheck="false"
+            />
+            <!-- JS: show/hide and populate this span on validation failure -->
+            <span id="repo-url-error"
+                  class="topbar__input-error"
+                  role="alert"
+                  aria-live="polite"
+                  hidden></span>
+
+            <button
+              type="submit"
+              id="scan-btn"
+              class="topbar__scan-btn"
+              aria-label="Scan repository for documentation drift">
+              <span class="topbar__scan-btn-icon" aria-hidden="true">⟳</span>
+              Scan Repository
+            </button>
+
+          </form>
+          <!-- /scan-form -->
+
+          <!-- Scan Status Indicator -->
+          <div class="topbar__status" id="topbar-status" role="status" aria-live="polite" aria-atomic="true">
+            <span class="topbar__status-dot topbar__status-dot--idle" id="status-dot"></span>
+            <span class="topbar__status-text" id="status-text">Ready</span>
+          </div>
+
+        </header>
+        <!-- /topbar -->
+
+        <!-- ───────────────────────────────────────
+             MAIN CONTENT AREA
+             Section visibility mechanism (CSS-class only):
+               - Every .content-section is hidden via CSS (display: none).
+               - JS adds .content-section--active to show one section at a time.
+               - JS removes .content-section--active from the previous section.
+               - No hidden attribute is used on sections — CSS class is the
+                 single source of truth.
+        ─────────────────────────────────────── -->
+        <main id="main-content" class="main-content" role="main">
+
+          <!-- ═══════════════════════════════════
+               SECTION: DASHBOARD
+          ═══════════════════════════════════ -->
+          <section id="section-dashboard"
+                   class="content-section content-section--active"
+                   data-section="dashboard"
+                   aria-labelledby="dashboard-heading">
+
+            <div class="section-header">
+              <h2 id="dashboard-heading" class="section-header__title">Overview</h2>
+              <p class="section-header__subtitle">
+                Last scan:
+                <!-- JS: set datetime attribute and textContent after each scan -->
+                <time id="last-scan-time" datetime="">Never</time>
+              </p>
+            </div>
+
+            <!-- Summary Stat Cards
+                 JS: set textContent of each .stat-card__value after scan -->
+            <div class="stats-grid" role="list" aria-label="Summary statistics">
+
+              <article class="stat-card" role="listitem" aria-label="Total files scanned">
+                <div class="stat-card__icon stat-card__icon--blue" aria-hidden="true">📁</div>
+                <div class="stat-card__body">
+                  <span class="stat-card__value" id="stat-files-scanned">0</span>
+                  <span class="stat-card__label">Files Scanned</span>
+                </div>
+              </article>
+
+              <article class="stat-card" role="listitem" aria-label="Total findings">
+                <div class="stat-card__icon stat-card__icon--red" aria-hidden="true">⚑</div>
+                <div class="stat-card__body">
+                  <span class="stat-card__value" id="stat-findings">0</span>
+                  <span class="stat-card__label">Findings</span>
+                </div>
+              </article>
+
+              <article class="stat-card" role="listitem" aria-label="Claims verified">
+                <div class="stat-card__icon stat-card__icon--green" aria-hidden="true">✔</div>
+                <div class="stat-card__body">
+                  <span class="stat-card__value" id="stat-claims-verified">0</span>
+                  <span class="stat-card__label">Claims Verified</span>
+                </div>
+              </article>
+
+              <article class="stat-card" role="listitem" aria-label="Suggested fixes">
+                <div class="stat-card__icon stat-card__icon--yellow" aria-hidden="true">✎</div>
+                <div class="stat-card__body">
+                  <span class="stat-card__value" id="stat-suggested-fixes">0</span>
+                  <span class="stat-card__label">Suggested Fixes</span>
+                </div>
+              </article>
+
+            </div>
+            <!-- /stats-grid -->
+
+            <!-- Dashboard panels: Drift Score + Recent Activity -->
+            <div class="dashboard-panels">
+
+              <section class="panel" aria-labelledby="drift-score-heading">
+                <header class="panel__header">
+                  <h3 id="drift-score-heading" class="panel__title">Documentation Drift Score</h3>
+                  <!-- JS: swap badge text/modifier class after scan -->
+                  <span class="panel__badge panel__badge--warning" id="drift-score-badge">Not yet scanned</span>
+                </header>
+                <div class="panel__body panel__body--centered">
+                  <!-- JS: update conic-gradient and inner value after scan -->
+                  <div class="drift-score-gauge"
+                       id="drift-score-gauge"
+                       aria-label="Drift score: not yet calculated"
+                       role="img">
+                    <span class="drift-score-gauge__value" id="drift-score-value">—</span>
+                    <span class="drift-score-gauge__label">Drift Score</span>
+                  </div>
+                  <p class="panel__hint">Run a scan to calculate the drift score for your repository.</p>
+                </div>
+              </section>
+
+              <section class="panel" aria-labelledby="recent-activity-heading">
+                <header class="panel__header">
+                  <h3 id="recent-activity-heading" class="panel__title">Recent Activity</h3>
+                </header>
+                <div class="panel__body">
+                  <!-- JS: replace empty item with real activity rows -->
+                  <ul class="activity-list" id="activity-list" role="list" aria-label="Recent scan activity">
+                    <li class="activity-list__item activity-list__item--empty">
+                      No scan activity yet. Enter a repository URL and click <strong>Scan Repository</strong>.
+                    </li>
+                  </ul>
+                </div>
+              </section>
+
+            </div>
+            <!-- /dashboard-panels -->
+
+            <!-- Severity Breakdown
+                 JS: set style="width: X%" and aria-valuenow on each .severity-bar__fill,
+                 set textContent on each .severity-bar__count -->
+            <section class="panel" aria-labelledby="severity-heading">
+              <header class="panel__header">
+                <h3 id="severity-heading" class="panel__title">Findings by Severity</h3>
+              </header>
+              <div class="panel__body">
+                <div class="severity-breakdown" id="severity-breakdown">
+
+                  <div class="severity-bar"
+                       role="meter"
+                       aria-label="Critical severity"
+                       aria-valuenow="0"
+                       aria-valuemin="0"
+                       aria-valuemax="100">
+                    <span class="severity-bar__label severity-bar__label--critical">Critical</span>
+                    <div class="severity-bar__track">
+                      <div class="severity-bar__fill severity-bar__fill--critical"
+                           id="severity-critical"
+                           style="width: 0%"></div>
+                    </div>
+                    <span class="severity-bar__count" id="count-critical">0</span>
+                  </div>
+
+                  <div class="severity-bar"
+                       role="meter"
+                       aria-label="High severity"
+                       aria-valuenow="0"
+                       aria-valuemin="0"
+                       aria-valuemax="100">
+                    <span class="severity-bar__label severity-bar__label--high">High</span>
+                    <div class="severity-bar__track">
+                      <div class="severity-bar__fill severity-bar__fill--high"
+                           id="severity-high"
+                           style="width: 0%"></div>
+                    </div>
+                    <span class="severity-bar__count" id="count-high">0</span>
+                  </div>
+
+                  <div class="severity-bar"
+                       role="meter"
+                       aria-label="Medium severity"
+                       aria-valuenow="0"
+                       aria-valuemin="0"
+                       aria-valuemax="100">
+                    <span class="severity-bar__label severity-bar__label--medium">Medium</span>
+                    <div class="severity-bar__track">
+                      <div class="severity-bar__fill severity-bar__fill--medium"
+                           id="severity-medium"
+                           style="width: 0%"></div>
+                    </div>
+                    <span class="severity-bar__count" id="count-medium">0</span>
+                  </div>
+
+                  <div class="severity-bar"
+                       role="meter"
+                       aria-label="Low severity"
+                       aria-valuenow="0"
+                       aria-valuemin="0"
+                       aria-valuemax="100">
+                    <span class="severity-bar__label severity-bar__label--low">Low</span>
+                    <div class="severity-bar__track">
+                      <div class="severity-bar__fill severity-bar__fill--low"
+                           id="severity-low"
+                           style="width: 0%"></div>
+                    </div>
+                    <span class="severity-bar__count" id="count-low">0</span>
+                  </div>
+
+                </div>
+              </div>
+            </section>
+
+          </section>
+          <!-- /section-dashboard -->
+
+          <!-- ═══════════════════════════════════
+               SECTION: FINDINGS
+          ═══════════════════════════════════ -->
+          <section id="section-findings"
+                   class="content-section"
+                   data-section="findings"
+                   aria-labelledby="findings-heading">
+
+            <div class="section-header">
+              <h2 id="findings-heading" class="section-header__title">Findings</h2>
+              <p class="section-header__subtitle">Documentation claims that have drifted out of sync with the codebase.</p>
+            </div>
+
+            <!-- Findings Toolbar -->
+            <div class="toolbar" role="toolbar" aria-label="Findings filters and actions">
+
+              <div class="toolbar__filters">
+                <label for="filter-severity" class="toolbar__label">Severity</label>
+                <select id="filter-severity" class="toolbar__select" aria-label="Filter by severity">
+                  <option value="all">All</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+
+                <label for="filter-file" class="toolbar__label">File</label>
+                <!-- JS: populate <option> elements dynamically after scan -->
+                <select id="filter-file" class="toolbar__select" aria-label="Filter by file">
+                  <option value="all">All files</option>
+                </select>
+
+                <label for="search-findings" class="sr-only">Search findings</label>
+                <input type="search"
+                       id="search-findings"
+                       class="toolbar__search"
+                       placeholder="Search findings…"
+                       aria-label="Search findings" />
+              </div>
+
+              <div class="toolbar__actions">
+                <button type="button"
+                        id="export-findings-btn"
+                        class="btn btn--secondary"
+                        aria-label="Export findings as CSV">
+                  ↓ Export CSV
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Findings Table
+                 JS: tbody rows are injected by findings.js.
+                 Each row should carry data-finding-id="F-NNN" so the
+                 evidence panel can be populated on row click. -->
+            <div class="table-wrapper" role="region" aria-label="Findings table" tabindex="0">
+              <table class="data-table" id="findings-table" aria-describedby="findings-heading">
+                <thead>
+                  <tr>
+                    <th scope="col" class="data-table__th" aria-sort="none">
+                      <button class="data-table__sort-btn" type="button" data-sort="id">ID</button>
+                    </th>
+                    <th scope="col" class="data-table__th" aria-sort="none">
+                      <button class="data-table__sort-btn" type="button" data-sort="severity">Severity</button>
+                    </th>
+                    <th scope="col" class="data-table__th">Doc File</th>
+                    <th scope="col" class="data-table__th">Claim</th>
+                    <th scope="col" class="data-table__th">Source File</th>
+                    <th scope="col" class="data-table__th" aria-sort="none">
+                      <button class="data-table__sort-btn" type="button" data-sort="detected">Detected</button>
+                    </th>
+                    <th scope="col" class="data-table__th">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="findings-tbody">
+                  <tr class="data-table__row data-table__row--placeholder">
+                    <td colspan="7" class="data-table__empty-cell">
+                      Run a repository scan to populate findings.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Findings Pagination -->
+            <nav class="pagination" id="findings-pagination" aria-label="Findings pagination">
+              <button type="button" class="pagination__btn" id="findings-prev" aria-label="Previous page" disabled>‹ Prev</button>
+              <span class="pagination__info" id="findings-page-info">Page 1 of 1</span>
+              <button type="button" class="pagination__btn" id="findings-next" aria-label="Next page" disabled>Next ›</button>
+            </nav>
+
+            <!-- ─────────────────────────────────────────────────────────────
+                 EVIDENCE COMPARISON PANEL
+                 ─────────────────────────────────────────────────────────────
+                 Purpose : Side-by-side view of the documentation claim (left)
+                           and the actual code implementation (right) for
+                           one selected finding.
+
+                 Initially hidden.  JS (findings.js) is responsible for:
+                   1. Setting data-finding-id to the selected row's finding ID.
+                   2. Populating #evidence-finding-label with the finding ID.
+                   3. Setting #evidence-doc-file and #evidence-code-file text.
+                   4. Setting #evidence-doc-content and #evidence-code-content
+                      innerHTML (pre-escaped code or plain text).
+                   5. Optionally wrapping conflicting tokens in
+                      <span class="evidence-panel__conflict"> for highlights.
+                   6. Removing the [hidden] attribute to reveal the panel.
+                   7. Restoring [hidden] when #evidence-panel-close is clicked.
+            ─────────────────────────────────────────────────────────────── -->
+            <div id="evidence-panel"
+                 class="evidence-panel-container"
+                 data-finding-id=""
+                 aria-labelledby="evidence-panel-title"
+                 hidden>
+
+              <div class="evidence-panel-container__header">
+                <h3 class="evidence-panel-container__title" id="evidence-panel-title">
+                  Evidence — Finding
+                  <span id="evidence-finding-label" class="evidence-panel-container__id">#—</span>
+                </h3>
+                <button type="button"
+                        id="evidence-panel-close"
+                        class="btn btn--ghost btn--sm"
+                        aria-label="Close evidence comparison panel">
+                  ✕ Close
+                </button>
+              </div>
+
+              <div class="evidence-columns">
+
+                <!-- Left: Documentation side -->
+                <section class="evidence-panel" aria-labelledby="evidence-doc-heading">
+                  <header class="evidence-panel__header evidence-panel__header--doc">
+                    <h4 id="evidence-doc-heading" class="evidence-panel__heading">
+                      Documentation Claim
+                    </h4>
+                    <span class="evidence-panel__file-ref file-path"
+                          id="evidence-doc-file">—</span>
+                  </header>
+                  <div class="evidence-panel__body">
+                    <pre class="evidence-panel__code"
+                         id="evidence-doc-content"
+                         aria-label="Documentation text"><code>Select a finding row to view evidence.</code></pre>
+                  </div>
+                </section>
+
+                <!-- Right: Code side -->
+                <section class="evidence-panel" aria-labelledby="evidence-code-heading">
+                  <header class="evidence-panel__header evidence-panel__header--code">
+                    <h4 id="evidence-code-heading" class="evidence-panel__heading">
+                      Actual Implementation
+                    </h4>
+                    <span class="evidence-panel__file-ref file-path"
+                          id="evidence-code-file">—</span>
+                  </header>
+                  <div class="evidence-panel__body">
+                    <pre class="evidence-panel__code"
+                         id="evidence-code-content"
+                         aria-label="Source code"><code>Select a finding row to view evidence.</code></pre>
+                  </div>
+                </section>
+
+              </div>
+            </div>
+            <!-- /evidence-panel -->
+
+            <!-- ─────────────────────────────────────────────────────────────
+                 FIX PREVIEW PANEL
+                 ─────────────────────────────────────────────────────────────
+                 Purpose : Side-by-side preview of the original documentation
+                           text (left) and the proposed corrected text (right),
+                           with inline Apply / Dismiss actions.
+
+                 Initially hidden.  JS (findings.js / fixes.js) is responsible for:
+                   1. Setting data-finding-id and data-fix-id.
+                   2. Populating #fix-preview-fix-label, #fix-preview-confidence.
+                   3. Setting #fix-preview-original-content and
+                      #fix-preview-proposed-content innerHTML.
+                   4. Removing the [hidden] attribute to reveal the panel.
+                   5. Restoring [hidden] on #fix-preview-close click, or when
+                      #fix-preview-apply-btn / #fix-preview-dismiss-btn fires.
+            ─────────────────────────────────────────────────────────────── -->
+            <div id="fix-preview-panel"
+                 class="fix-preview-container"
+                 data-finding-id=""
+                 data-fix-id=""
+                 aria-labelledby="fix-preview-title"
+                 hidden>
+
+              <div class="fix-preview-container__header">
+                <h3 class="fix-preview-container__title" id="fix-preview-title">
+                  Fix Preview —
+                  <span id="fix-preview-fix-label" class="fix-preview-container__id">#—</span>
+                </h3>
+                <span class="fix-preview-container__confidence"
+                      id="fix-preview-confidence">Confidence: —</span>
+                <button type="button"
+                        id="fix-preview-close"
+                        class="btn btn--ghost btn--sm"
+                        aria-label="Close fix preview panel">
+                  ✕ Close
+                </button>
+              </div>
+
+              <div class="fix-preview-columns">
+
+                <!-- Left: Original documentation -->
+                <section class="fix-preview-panel" aria-labelledby="fix-preview-original-heading">
+                  <header class="fix-preview-panel__header fix-preview-panel__header--original">
+                    <h4 id="fix-preview-original-heading" class="fix-preview-panel__heading">
+                      Original Documentation
+                    </h4>
+                  </header>
+                  <div class="fix-preview-panel__body">
+                    <pre class="fix-preview-panel__code"
+                         id="fix-preview-original-content"
+                         aria-label="Original documentation text"><code>—</code></pre>
+                  </div>
+                </section>
+
+                <!-- Right: Proposed correction -->
+                <section class="fix-preview-panel" aria-labelledby="fix-preview-proposed-heading">
+                  <header class="fix-preview-panel__header fix-preview-panel__header--proposed">
+                    <h4 id="fix-preview-proposed-heading" class="fix-preview-panel__heading">
+                      Proposed Correction
+                    </h4>
+                  </header>
+                  <div class="fix-preview-panel__body">
+                    <pre class="fix-preview-panel__code"
+                         id="fix-preview-proposed-content"
+                         aria-label="Proposed correction text"><code>—</code></pre>
+                  </div>
+                </section>
+
+              </div>
+
+              <footer class="fix-preview-container__footer">
+                <button type="button"
+                        id="fix-preview-apply-btn"
+                        class="btn btn--primary"
+                        aria-label="Apply this fix to the documentation">
+                  ✔ Apply This Fix
+                </button>
+                <button type="button"
+                        id="fix-preview-dismiss-btn"
+                        class="btn btn--ghost"
+                        aria-label="Dismiss this fix suggestion">
+                  ✕ Dismiss
+                </button>
+              </footer>
+
+            </div>
+            <!-- /fix-preview-panel -->
+
+          </section>
+          <!-- /section-findings -->
+
+          <!-- ═══════════════════════════════════
+               SECTION: CLAIMS LEDGER
+          ═══════════════════════════════════ -->
+          <section id="section-ledger"
+                   class="content-section"
+                   data-section="ledger"
+                   aria-labelledby="ledger-heading">
+
+            <div class="section-header">
+              <h2 id="ledger-heading" class="section-header__title">Claims Ledger</h2>
+              <p class="section-header__subtitle">Every extractable documentation claim and its current verification status.</p>
+            </div>
+
+            <!-- Ledger Toolbar -->
+            <div class="toolbar" role="toolbar" aria-label="Ledger filters">
+
+              <div class="toolbar__filters">
+                <label for="filter-ledger-status" class="toolbar__label">Status</label>
+                <select id="filter-ledger-status" class="toolbar__select" aria-label="Filter by verification status">
+                  <option value="all">All</option>
+                  <option value="verified">Verified</option>
+                  <option value="drifted">Drifted</option>
+                  <option value="unverified">Unverified</option>
+                </select>
+
+                <label for="filter-ledger-type" class="toolbar__label">Type</label>
+                <select id="filter-ledger-type" class="toolbar__select" aria-label="Filter by claim type">
+                  <option value="all">All types</option>
+                  <option value="function">Function</option>
+                  <option value="endpoint">Endpoint</option>
+                  <option value="config">Config</option>
+                  <option value="schema">Schema</option>
+                </select>
+
+                <label for="search-ledger" class="sr-only">Search claims</label>
+                <input type="search"
+                       id="search-ledger"
+                       class="toolbar__search"
+                       placeholder="Search claims…"
+                       aria-label="Search claims" />
+              </div>
+
+              <div class="toolbar__actions">
+                <button type="button"
+                        id="export-ledger-btn"
+                        class="btn btn--secondary"
+                        aria-label="Export claims ledger as CSV">
+                  ↓ Export CSV
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Ledger Table
+                 JS: tbody rows are injected by ledger.js.
+                 Each row should carry data-claim-id="C-NNN". -->
+            <div class="table-wrapper" role="region" aria-label="Claims ledger table" tabindex="0">
+              <table class="data-table" id="ledger-table" aria-describedby="ledger-heading">
+                <thead>
+                  <tr>
+                    <th scope="col" class="data-table__th">Claim ID</th>
+                    <th scope="col" class="data-table__th">Type</th>
+                    <th scope="col" class="data-table__th">Doc File</th>
+                    <th scope="col" class="data-table__th">Claim Text</th>
+                    <th scope="col" class="data-table__th">Status</th>
+                    <th scope="col" class="data-table__th">Last Verified</th>
+                    <th scope="col" class="data-table__th">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="ledger-tbody">
+                  <tr class="data-table__row data-table__row--placeholder">
+                    <td colspan="7" class="data-table__empty-cell">
+                      No claims extracted yet. Run a scan to populate the ledger.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Ledger Pagination -->
+            <nav class="pagination" id="ledger-pagination" aria-label="Claims ledger pagination">
+              <button type="button" class="pagination__btn" id="ledger-prev" aria-label="Previous page" disabled>‹ Prev</button>
+              <span class="pagination__info" id="ledger-page-info">Page 1 of 1</span>
+              <button type="button" class="pagination__btn" id="ledger-next" aria-label="Next page" disabled>Next ›</button>
+            </nav>
+
+          </section>
+          <!-- /section-ledger -->
+
+          <!-- ═══════════════════════════════════
+               SECTION: SUGGESTED FIXES
+          ═══════════════════════════════════ -->
+          <section id="section-fixes"
+                   class="content-section"
+                   data-section="fixes"
+                   aria-labelledby="fixes-heading">
+
+            <div class="section-header">
+              <h2 id="fixes-heading" class="section-header__title">Suggested Fixes</h2>
+              <p class="section-header__subtitle">Evidence-backed documentation correction previews. No repository files are modified.</p>
+            </div>
+
+            <!-- Fixes Toolbar -->
+            <div class="toolbar" role="toolbar" aria-label="Suggested fixes filters and actions">
+
+              <div class="toolbar__filters">
+                <label for="filter-fixes-status" class="toolbar__label">Status</label>
+                <select id="filter-fixes-status" class="toolbar__select" aria-label="Filter fixes by status">
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="applied">Applied</option>
+                  <option value="dismissed">Dismissed</option>
+                </select>
+
+                <label for="search-fixes" class="sr-only">Search fixes</label>
+                <input type="search"
+                       id="search-fixes"
+                       class="toolbar__search"
+                       placeholder="Search fixes…"
+                       aria-label="Search fixes" />
+              </div>
+
+              <div class="toolbar__actions">
+                <!--
+                  "Apply All Pending" scopes the action to fixes with status=pending only.
+                  JS must show a confirmation dialog before applying.
+                  aria-label is intentionally explicit about the confirmation requirement.
+                -->
+                <button type="button"
+                        id="apply-all-fixes-btn"
+                        class="btn btn--primary"
+                        aria-label="Apply all pending fixes — requires confirmation">
+                  ✔ Apply All Pending
+                </button>
+                <button type="button"
+                        id="dismiss-all-fixes-btn"
+                        class="btn btn--danger"
+                        aria-label="Dismiss all pending fix suggestions">
+                  ✕ Dismiss All Pending
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Fixes List
+                 JS: .fix-card articles are injected by fixes.js.
+                 Each card should carry data-fix-id="FIX-NNN" and
+                 data-finding-id="F-NNN". -->
+            <div id="fixes-list" class="fixes-list" role="list" aria-label="Suggested documentation fixes">
+
+              <!-- Empty state (displayed initially until a scan generates fixes) -->
+              <div class="fixes-list__empty" id="fixes-empty">
+                <p>No suggested fixes available. Run a scan to generate fix suggestions.</p>
+              </div>
+
+            </div>
+            <!-- /fixes-list -->
+
+          </section>
+          <!-- /section-fixes -->
+
+        </main>
+        <!-- /main-content -->
+
+      </div>
+      <!-- /main-column -->
+
+    </div>
+    <!-- /app-shell -->
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         MOBILE SIDEBAR BACKDROP
+         Rendered outside .app-shell so it can cover the full viewport.
+         JS: add .sidebar-backdrop--visible to show,
+             remove to hide (on close button, ESC key, or backdrop click).
+         aria-hidden is always true — purely decorative overlay.
+    ─────────────────────────────────────────────────────────────────────────── -->
+    <div id="sidebar-backdrop"
+         class="sidebar-backdrop"
+         aria-hidden="true"></div>
+
+    <!-- ═══════════════════════════════════════════
+         GLOBAL OVERLAY / MODAL — Scan Progress
+         ═══════════════════════════════════════════
+         Focus management (requires JS in app.js):
+           SHOW: overlay.removeAttribute('hidden')
+                 overlayBox.focus()           ← tabindex="-1" enables this
+                 Trap Tab/Shift-Tab inside .overlay__box.
+           HIDE: overlay.setAttribute('hidden', '')
+                 scanBtn.focus()              ← return focus to trigger element
+    ═══════════════════════════════════════════ -->
+    <div id="scan-overlay"
+         class="overlay"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="scan-overlay-title"
+         aria-describedby="scan-overlay-message"
+         hidden>
+      <!-- tabindex="-1" allows JS to programmatically focus this box -->
+      <div class="overlay__box" tabindex="-1">
+        <h2 id="scan-overlay-title" class="overlay__title">Scanning Repository…</h2>
+        <p id="scan-overlay-message" class="overlay__message">Initializing…</p>
+        <div class="overlay__progress-track"
+             role="progressbar"
+             aria-valuemin="0"
+             aria-valuemax="100"
+             aria-valuenow="0"
+             aria-label="Scan progress"
+             id="scan-progress-bar-container">
+          <div class="overlay__progress-fill" id="scan-progress-fill" style="width: 0%"></div>
+        </div>
+        <!-- JS: update textContent to "X%" and sync with aria-valuenow above -->
+        <p class="overlay__progress-label" id="scan-progress-label">0%</p>
+        <button type="button"
+                id="cancel-scan-btn"
+                class="btn btn--ghost overlay__cancel-btn"
+                aria-label="Cancel the current repository scan">
+          Cancel Scan
+        </button>
+      </div>
+    </div>
+    <!-- /scan-overlay -->
+
+    <!-- ═══════════════════════════════════════════
+         TOAST NOTIFICATION CONTAINER
+    ═══════════════════════════════════════════ -->
+    <div id="toast-container"
+         class="toast-container"
+         role="region"
+         aria-live="assertive"
+         aria-atomic="true"
+         aria-label="Notifications">
+      <!-- Toast messages injected by app.js -->
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         JAVASCRIPT  (defer = non-blocking, ordered)
+         Paths use /static/ prefix — see Flask config note in <head>.
+    ═══════════════════════════════════════════ -->
+    <script src="/static/js/api.js" defer></script>
+    <script src="/static/js/dashboard.js" defer></script>
+    <script src="/static/js/findings.js" defer></script>
+    <script src="/static/js/ledger.js" defer></script>
+    <script src="/static/js/fixes.js" defer></script>
+    <script src="/static/js/app.js" defer></script>
+
+  </body>
+</html>
